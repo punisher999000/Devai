@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subir Imágenes a Drive</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #4CAF50;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>📁 Subir Imágenes a Google Drive</h1>
+    
+    <p>Primero, autentícate con Google:</p>
+    <a href="/auth">
+        <button>🔑 Autenticar con Google</button>
+    </a>
+    
+    <div id="uploadSection" style="display: none;">
+        <p>¡Listo! Ahora puedes subir imágenes:</p>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p>📎 Haz clic aquí o arrastra una imagen</p>
+            <p><small>Formatos: JPG, PNG, GIF</small></p>
+        </div>
+        
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        
+        <button onclick="uploadFile()" id="uploadBtn" disabled>⬆️ Subir Imagen</button>
+        
+        <div id="result"></div>
+        <div id="progress"></div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        
+        // Mostrar sección de upload después de autenticar
+        if (window.location.search.includes('auth=success')) {
+            document.getElementById('uploadSection').style.display = 'block';
+        }
+        
+        // Manejar selección de archivo
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                document.getElementById('uploadBtn').disabled = false;
+                
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const uploadArea = document.querySelector('.upload-area');
+                    uploadArea.innerHTML = `
+                        <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; border-radius: 5px;">
+                        <p>${selectedFile.name}</p>
+                        <p><small>${(selectedFile.size / 1024 / 1024).toFixed(2)} MB</small></p>
+                    `;
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+        
+        // Función para subir archivo
+        async function uploadFile() {
+            if (!selectedFile) return;
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            const resultDiv = document.getElementById('result');
+            const progressDiv = document.getElementById('progress');
+            
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Subiendo...';
+            progressDiv.innerHTML = '⏳ Subiendo archivo...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('imagen', selectedFile);
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        ✅ <strong>¡Éxito!</strong><br>
+                        Archivo: ${data.fileName}<br>
+                        <small>ID: ${data.fileId}</small>
+                    `;
+                    
+                    // Resetear formulario
+                    document.querySelector('.upload-area').innerHTML = `
+                        <p>📎 Haz clic aquí o arrastra una imagen</p>
+                        <p><small>Formatos: JPG, PNG, GIF</small></p>
+                    `;
+                    selectedFile = null;
+                    document.getElementById('fileInput').value = '';
+                    
+                } else {
+                    throw new Error(data.message);
+                }
+                
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `❌ <strong>Error:</strong> ${error.message}`;
+            }
+            
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '⬆️ Subir Imagen';
+            progressDiv.innerHTML = '';
+        }
+        
+        // Drag and drop
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4CAF50';
+            uploadArea.style.backgroundColor = '#f0f8f0';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '';
+            
+            if (e.dataTransfer.files.length > 0) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                document.getElementById('fileInput').dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>
