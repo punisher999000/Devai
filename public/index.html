@@ -272,12 +272,12 @@
                 
                 if (!data.authenticated) {
                     // Redirigir a página de autenticación si no está autenticado
-                    window.location.href = 'auth.html';
+                    window.location.href = '../auth.html';
                 }
             } catch (error) {
                 showStatus('❌ Error de conexión. Redirigiendo...', 'error');
                 setTimeout(() => {
-                    window.location.href = 'auth.html';
+                    window.location.href = '../auth.html';
                 }, 2000);
             }
         }
@@ -380,7 +380,7 @@
                 
                 if (error.message.includes('autentic') || error.message.includes('auth')) {
                     setTimeout(() => {
-                        window.location.href = 'auth.html';
+                        window.location.href = '../auth.html';
                     }, 2000);
                 }
             } finally {
@@ -397,7 +397,7 @@
                 } catch (error) {
                     // Ignorar errores de logout
                 } finally {
-                    window.location.href = 'auth.html';
+                    window.location.href = '../auth.html';
                 }
             }
         }
