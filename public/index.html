@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevAI - Subir Archivos a Google Drive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .auth-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .auth-section h2 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
+
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .upload-section {
+            display: none;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 3px dashed #4CAF50;
+            border-radius: 10px;
+            padding: 40px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8fff8;
+        }
+
+        .upload-area:hover {
+            border-color: #45a049;
+            background: #f0fff0;
+        }
+
+        .upload-area.highlight {
+            border-color: #2196F3;
+            background: #f0f8ff;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .file-info {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .file-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .progress {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 DevAI</h1>
+            <p>Sube archivos a tu Google Drive de forma segura</p>
+        </div>
+
+        <div class="content">
+            <!-- Sección de Autenticación -->
+            <div class="auth-section" id="authSection">
+                <h2>🔐 Primero, autentícate con Google</h2>
+                <p>Necesitamos permisos para subir archivos a tu Drive</p>
+                <button class="btn" onclick="authenticate()">Iniciar Autenticación con Google</button>
+            </div>
+
+            <!-- Sección de Subida -->
+            <div class="upload-section" id="uploadSection">
+                <h2>📁 Subir Archivo a Google Drive</h2>
+                
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📎</div>
+                    <h3>Haz clic aquí o arrastra un archivo</h3>
+                    <p>Formatos soportados: JPG, PNG, GIF, PDF, etc.</p>
+                    <p><small>Máximo 10MB</small></p>
+                </div>
+
+                <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(this.files)">
+
+                <div class="file-info" id="fileInfo">
+                    <strong>Archivo seleccionado:</strong>
+                    <div id="fileName"></div>
+                    <div id="fileSize"></div>
+                    <img id="filePreview" class="file-preview">
+                </div>
+
+                <button class="btn" id="uploadBtn" onclick="uploadFile()" disabled>⬆️ Subir Archivo</button>
+
+                <div class="progress" id="progress">
+                    <p>⏳ Subiendo archivo...</p>
+                </div>
+
+                <div class="result" id="result"></div>
+
+                <div class="status" id="status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://devai-production.up.railway.app';
+
+        // Verificar estado de autenticación al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            setupDragAndDrop();
+        });
+
+        // Verificar si está autenticado
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`);
+                const status = await response.json();
+                
+                if (status.authenticated) {
+                    showUploadSection();
+                }
+            } catch (error) {
+                console.log('No autenticado aún');
+            }
+        }
+
+        // Mostrar sección de subida
+        function showUploadSection() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('uploadSection').style.display = 'block';
+        }
+
+        // Iniciar autenticación
+        function authenticate() {
+            window.location.href = `${API_BASE}/auth`;
+        }
+
+        // Configurar drag and drop
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('highlight');
+            });
+
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.classList.remove('highlight');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('highlight');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileSelect(e.dataTransfer.files);
+                }
+            });
+        }
+
+        // Manejar selección de archivo
+        function handleFileSelect(files) {
+            if (files.length === 0) return;
+
+            const file = files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const filePreview = document.getElementById('filePreview');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            // Mostrar información del archivo
+            fileName.textContent = `Nombre: ${file.name}`;
+            fileSize.textContent = `Tamaño: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            
+            // Mostrar preview si es imagen
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    filePreview.src = e.target.result;
+                    filePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                filePreview.style.display = 'none';
+            }
+
+            fileInfo.style.display = 'block';
+            uploadBtn.disabled = false;
+            
+            // Guardar archivo para subir
+            window.selectedFile = file;
+        }
+
+        // Subir archivo
+        async function uploadFile() {
+            if (!window.selectedFile) return;
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progress = document.getElementById('progress');
+            const result = document.getElementById('result');
+            const status = document.getElementById('status');
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Subiendo...';
+            progress.style.display = 'block';
+            result.style.display = 'none';
+            status.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('imagen', window.selectedFile);
+
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        ✅ <strong>¡Éxito!</strong><br>
+                        Archivo: ${data.fileName}<br>
+                        <small>ID: ${data.fileId}</small>
+                    `;
+                    
+                    // Resetear formulario
+                    resetUploadForm();
+                } else {
+                    throw new Error(data.message);
+                }
+
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `❌ <strong>Error:</strong> ${error.message}`;
+                
+                // Mostrar botón para reintentar si es error de autenticación
+                if (error.message.includes('autenticado')) {
+                    status.style.display = 'block';
+                    status.className = 'status error';
+                    status.innerHTML = `
+                        <p>Tu sesión expiró. Por favor, autentícate nuevamente.</p>
+                        <button class="btn" onclick="authenticate()">Reautenticar</button>
+                    `;
+                }
+            }
+
+            result.style.display = 'block';
+            progress.style.display = 'none';
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '⬆️ Subir Archivo';
+        }
+
+        // Resetear formulario de subida
+        function resetUploadForm() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+            window.selectedFile = null;
+        }
+
+        // Escuchar mensajes de la ventana de autenticación
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'AUTH_SUCCESS') {
+                showUploadSection();
+                checkAuthStatus();
+            }
+        });
+    </script>
+</body>
+</html>
