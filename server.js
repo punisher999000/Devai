@@ -8,200 +8,177 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware para móviles
 app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configuración de Multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = 'uploads/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
+// Configuración simple de Multer (solo imágenes)
+const upload = multer({
+  dest: 'uploads/',
   limits: {
-    fileSize: 10 * 1024 * 1024
+    fileSize: 5 * 1024 * 1024, // 5MB máximo
+  },
+  fileFilter: (req, file, cb) => {
+    // Solo permitir imágenes
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'), false);
+    }
   }
 });
 
-// Configura OAuth2
+// Configuración OAuth2
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
   process.env.REDIRECT_URI
 );
 
-let userTokens = {};
+let accessToken = null;
 
-// ===== RUTAS =====
+// ===== RUTAS SIMPLIFICADAS =====
 
+// Página principal optimizada para móviles
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Autenticación simple
 app.get('/auth', (req, res) => {
-  try {
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/drive.file'],
-      prompt: 'consent'
-    });
-    
-    console.log('🔗 Redirigiendo a Google OAuth');
-    res.redirect(authUrl);
-    
-  } catch (error) {
-    console.error('Error en /auth:', error);
-    res.status(500).json({ error: 'Error de configuración OAuth' });
-  }
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/drive.file'],
+    prompt: 'consent'
+  });
+  res.redirect(authUrl);
 });
 
+// Callback simplificado
 app.get('/auth/callback', async (req, res) => {
-  const { code, error } = req.query;
-
-  if (error) {
-    console.error('Error OAuth:', error);
-    return res.send(`
-      <html>
-      <body style="font-family: Arial; padding: 50px; text-align: center;">
-        <h2 style="color: red;">Error de Google: ${error}</h2>
-        <a href="/">Volver al inicio</a>
-      </body>
-      </html>
-    `);
-  }
+  const { code } = req.query;
 
   try {
-    console.log('🔑 Intercambiando código por tokens...');
     const { tokens } = await oauth2Client.getToken(code);
-    userTokens = tokens;
+    accessToken = tokens.access_token;
     
-    console.log('✅ Autenticación exitosa');
-    
+    // Redirigir a la app con éxito
     res.send(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Autenticación Exitosa</title>
-        <meta http-equiv="refresh" content="3;url=/" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Éxito</title>
         <style>
           body { 
-            font-family: Arial, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             text-align: center; 
-            padding: 50px; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px; 
+            background: #4CAF50;
             color: white;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
           }
-          .success { 
-            font-size: 28px; 
-            margin: 30px 0;
-          }
-          .icon { 
-            font-size: 64px; 
-            margin: 20px 0;
+          .icon { font-size: 80px; margin: 20px 0; }
+          .message { font-size: 24px; margin: 20px 0; }
+          button { 
+            background: white; 
+            color: #4CAF50; 
+            border: none; 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            border-radius: 25px; 
+            margin: 20px; 
+            cursor: pointer;
           }
         </style>
       </head>
       <body>
         <div class="icon">✅</div>
-        <div class="success">¡Autenticación Exitosa!</div>
-        <p>Serás redirigido automáticamente...</p>
-        <p><a href="/" style="color: #4CAF50;">Haz clic aquí si no redirige</a></p>
+        <div class="message">¡Listo!</div>
+        <p>Ya puedes subir imágenes</p>
+        <button onclick="window.close()">Cerrar</button>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage('AUTH_SUCCESS', '*');
+            setTimeout(() => window.close(), 1000);
+          }
+        </script>
       </body>
       </html>
     `);
     
   } catch (error) {
-    console.error('Error en callback:', error);
     res.send(`
       <html>
-      <body style="font-family: Arial; padding: 50px; text-align: center;">
-        <h2 style="color: red;">Error: ${error.message}</h2>
-        <a href="/">Volver al inicio</a>
+      <body style="font-family: sans-serif; padding: 20px; text-align: center;">
+        <div style="color: red; font-size: 24px;">❌ Error</div>
+        <p>${error.message}</p>
+        <button onclick="window.history.back()">Volver</button>
       </body>
       </html>
     `);
   }
 });
 
-app.get('/auth/status', (req, res) => {
-  res.json({ 
-    authenticated: !!userTokens.access_token
-  });
-});
-
+// Subida de imágenes simplificada
 app.post('/upload', upload.single('imagen'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No se seleccionó ningún archivo' 
-      });
+      return res.json({ success: false, message: 'No se seleccionó imagen' });
     }
 
-    if (!userTokens.access_token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No estás autenticado' 
-      });
+    if (!accessToken) {
+      return res.json({ success: false, message: 'Necesitas autenticarte' });
     }
 
-    oauth2Client.setCredentials(userTokens);
+    oauth2Client.setCredentials({ access_token: accessToken });
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-    const fileMetadata = {
-      'name': req.file.originalname,
-      'parents': [process.env.FOLDER_ID]
-    };
-
-    const media = {
-      mimeType: req.file.mimetype,
-      body: fs.createReadStream(req.file.path)
-    };
-
+    // Subir a la carpeta específica
     const response = await drive.files.create({
-      resource: fileMetadata,
-      media: media,
+      requestBody: {
+        name: req.file.originalname,
+        parents: [process.env.FOLDER_ID]
+      },
+      media: {
+        mimeType: req.file.mimetype,
+        body: fs.createReadStream(req.file.path)
+      },
       fields: 'id, name'
     });
 
+    // Limpiar
     fs.unlinkSync(req.file.path);
 
     res.json({ 
       success: true, 
-      message: '¡Archivo subido exitosamente!',
-      fileId: response.data.id,
+      message: '✅ Imagen subida',
       fileName: response.data.name
     });
 
   } catch (error) {
-    console.error('Error subiendo archivo:', error);
-    
+    // Limpiar en error
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
     
-    res.status(500).json({ 
+    res.json({ 
       success: false, 
       message: 'Error: ' + error.message 
     });
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Verificar autenticación
+app.get('/auth/status', (req, res) => {
+  res.json({ authenticated: !!accessToken });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor DevAI corriendo en puerto ${PORT}`);
+  console.log(`📱 App móvil corriendo en puerto ${PORT}`);
 });

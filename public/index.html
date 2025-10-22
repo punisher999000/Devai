@@ -2,17 +2,18 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DevAI - Subir Archivos a Google Drive</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📷 Subir a Drive</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -20,310 +21,366 @@
         }
 
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 100%;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
+            margin: 0 auto;
         }
 
         .header {
             background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
             color: white;
-            padding: 30px;
+            padding: 30px 20px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 2.5em;
+            font-size: 28px;
             margin-bottom: 10px;
+            font-weight: 600;
         }
 
         .header p {
-            font-size: 1.1em;
+            font-size: 16px;
             opacity: 0.9;
         }
 
         .content {
-            padding: 40px;
+            padding: 30px 20px;
         }
 
-        .auth-section {
+        /* Estados de la app */
+        .state {
+            display: none;
             text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
         }
 
-        .auth-section h2 {
-            color: #4CAF50;
-            margin-bottom: 15px;
+        .state.active {
+            display: block;
         }
 
+        /* Botones móviles */
         .btn {
+            display: block;
+            width: 100%;
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 15px 30px;
-            font-size: 1.1em;
-            border-radius: 8px;
+            padding: 18px;
+            font-size: 18px;
+            border-radius: 15px;
             cursor: pointer;
-            transition: background 0.3s;
-            text-decoration: none;
-            display: inline-block;
+            margin: 15px 0;
+            font-weight: 600;
+            transition: all 0.3s;
         }
 
-        .btn:hover {
+        .btn:active {
+            transform: scale(0.98);
             background: #45a049;
         }
 
         .btn:disabled {
-            background: #cccccc;
+            background: #ccc;
             cursor: not-allowed;
+            transform: none;
         }
 
-        .upload-section {
-            display: none;
-            text-align: center;
+        .btn-secondary {
+            background: #6c757d;
         }
 
+        .btn-secondary:active {
+            background: #5a6268;
+        }
+
+        /* Área de subida */
         .upload-area {
             border: 3px dashed #4CAF50;
-            border-radius: 10px;
-            padding: 40px;
+            border-radius: 15px;
+            padding: 40px 20px;
             margin: 20px 0;
-            cursor: pointer;
-            transition: all 0.3s;
             background: #f8fff8;
-        }
-
-        .upload-area:hover {
-            border-color: #45a049;
-            background: #f0fff0;
+            transition: all 0.3s;
         }
 
         .upload-area.highlight {
             border-color: #2196F3;
-            background: #f0f8ff;
+            background: #e3f2fd;
         }
 
         .upload-icon {
-            font-size: 48px;
+            font-size: 60px;
             color: #4CAF50;
             margin-bottom: 15px;
         }
 
+        /* Preview de imagen */
+        .preview-container {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
         .file-info {
-            margin: 20px 0;
-            padding: 15px;
             background: #f8f9fa;
-            border-radius: 8px;
-            display: none;
-        }
-
-        .file-preview {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
-
-        .result {
-            margin: 20px 0;
             padding: 15px;
-            border-radius: 8px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+
+        /* Estados y mensajes */
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 16px;
             display: none;
         }
 
-        .success {
+        .status.success {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
 
-        .error {
+        .status.error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
 
-        .progress {
-            margin: 20px 0;
-            display: none;
-        }
-
-        .status {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 5px;
-            display: none;
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
 
         .loading {
             display: none;
-            color: #666;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mejoras táctiles */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 25px 15px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .btn {
+                padding: 16px;
+                font-size: 16px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 DevAI</h1>
-            <p>Sube archivos a tu Google Drive de forma segura</p>
+            <h1>📷 Mi Portafolio</h1>
+            <p>Sube imágenes a tu carpeta de Drive</p>
         </div>
 
         <div class="content">
-            <!-- Sección de Autenticación -->
-            <div class="auth-section" id="authSection">
-                <h2>🔐 Primero, autentícate con Google</h2>
-                <p>Necesitamos permisos para subir archivos a tu Drive</p>
-                <button class="btn" onclick="authenticate()">Iniciar Autenticación con Google</button>
+            <!-- Estado: No autenticado -->
+            <div class="state active" id="stateAuth">
+                <div style="font-size: 80px; margin: 20px 0;">🔐</div>
+                <h2 style="margin: 20px 0; color: #333;">Conectar con Google Drive</h2>
+                <p style="margin: 15px 0; color: #666;">Necesitamos acceso para subir imágenes a tu carpeta</p>
+                <button class="btn" onclick="authenticate()">Conectar con Google</button>
             </div>
 
-            <!-- Sección de Subida -->
-            <div class="upload-section" id="uploadSection">
-                <h2>📁 Subir Archivo a Google Drive</h2>
+            <!-- Estado: Autenticado -->
+            <div class="state" id="stateUpload">
+                <h2 style="margin: 20px 0; color: #333;">Subir Imagen</h2>
                 
-                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-icon">📎</div>
-                    <h3>Haz clic aquí o arrastra un archivo</h3>
-                    <p>Formatos soportados: JPG, PNG, GIF, PDF, etc.</p>
-                    <p><small>Máximo 10MB</small></p>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>Toca aquí o arrastra una imagen</h3>
+                    <p style="color: #666; margin: 10px 0;">JPG, PNG, GIF (max 5MB)</p>
                 </div>
 
-                <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(this.files)">
+                <input type="file" id="fileInput" accept="image/*" style="display: none;">
 
-                <div class="file-info" id="fileInfo">
-                    <strong>Archivo seleccionado:</strong>
-                    <div id="fileName"></div>
-                    <div id="fileSize"></div>
-                    <img id="filePreview" class="file-preview">
+                <div class="preview-container" id="previewContainer">
+                    <img class="preview-image" id="previewImage">
+                    <div class="file-info" id="fileInfo"></div>
                 </div>
 
-                <button class="btn" id="uploadBtn" onclick="uploadFile()" disabled>⬆️ Subir Archivo</button>
-
-                <div class="progress" id="progress">
-                    <p>⏳ Subiendo archivo...</p>
-                </div>
-
-                <div class="result" id="result"></div>
-
-                <div class="status" id="status"></div>
+                <button class="btn" id="uploadBtn" onclick="uploadImage()" disabled>Subir Imagen</button>
+                <button class="btn btn-secondary" onclick="logout()">Desconectar</button>
             </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Subiendo imagen...</p>
+            </div>
+
+            <!-- Mensajes de estado -->
+            <div class="status" id="statusMessage"></div>
         </div>
     </div>
 
     <script>
         const API_BASE = 'https://devai-production.up.railway.app';
+        let selectedFile = null;
 
-        // Verificar estado de autenticación al cargar
+        // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
             checkAuthStatus();
-            setupDragAndDrop();
+            setupUploadArea();
         });
 
-        // Verificar si está autenticado
+        // Verificar autenticación
         async function checkAuthStatus() {
             try {
+                showLoading('Verificando...');
                 const response = await fetch(`${API_BASE}/auth/status`);
-                const status = await response.json();
+                const data = await response.json();
                 
-                if (status.authenticated) {
-                    showUploadSection();
+                if (data.authenticated) {
+                    showState('upload');
+                } else {
+                    showState('auth');
                 }
             } catch (error) {
-                console.log('No autenticado aún');
+                showState('auth');
+                showStatus('Error de conexión', 'error');
+            } finally {
+                hideLoading();
             }
         }
 
-        // Mostrar sección de subida
-        function showUploadSection() {
-            document.getElementById('authSection').style.display = 'none';
-            document.getElementById('uploadSection').style.display = 'block';
-        }
-
-        // Iniciar autenticación
+        // Autenticar
         function authenticate() {
-            window.location.href = `${API_BASE}/auth`;
+            // Abrir en ventana nueva para móviles
+            const authWindow = window.open(`${API_BASE}/auth`, 'auth', 'width=600,height=700');
+            
+            // Verificar cada segundo si se cerró
+            const checkWindow = setInterval(() => {
+                if (authWindow.closed) {
+                    clearInterval(checkWindow);
+                    checkAuthStatus();
+                }
+            }, 1000);
         }
 
-        // Configurar drag and drop
-        function setupDragAndDrop() {
+        // Configurar área de subida
+        function setupUploadArea() {
             const uploadArea = document.getElementById('uploadArea');
-            
-            uploadArea.addEventListener('dragover', function(e) {
+            const fileInput = document.getElementById('fileInput');
+
+            // Tocar área
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Seleccionar archivo
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
+
+            // Drag & drop
+            uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadArea.classList.add('highlight');
             });
 
-            uploadArea.addEventListener('dragleave', function() {
+            uploadArea.addEventListener('dragleave', () => {
                 uploadArea.classList.remove('highlight');
             });
 
-            uploadArea.addEventListener('drop', function(e) {
+            uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('highlight');
-                
                 if (e.dataTransfer.files.length > 0) {
-                    handleFileSelect(e.dataTransfer.files);
+                    handleFileSelect(e.dataTransfer.files[0]);
                 }
             });
         }
 
         // Manejar selección de archivo
-        function handleFileSelect(files) {
-            if (files.length === 0) return;
-
-            const file = files[0];
-            const fileInfo = document.getElementById('fileInfo');
-            const fileName = document.getElementById('fileName');
-            const fileSize = document.getElementById('fileSize');
-            const filePreview = document.getElementById('filePreview');
-            const uploadBtn = document.getElementById('uploadBtn');
-
-            // Mostrar información del archivo
-            fileName.textContent = `Nombre: ${file.name}`;
-            fileSize.textContent = `Tamaño: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-            
-            // Mostrar preview si es imagen
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    filePreview.src = e.target.result;
-                    filePreview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            } else {
-                filePreview.style.display = 'none';
+        function handleFileSelect(file) {
+            if (!file.type.startsWith('image/')) {
+                showStatus('Solo se permiten imágenes', 'error');
+                return;
             }
 
-            fileInfo.style.display = 'block';
-            uploadBtn.disabled = false;
+            if (file.size > 5 * 1024 * 1024) {
+                showStatus('La imagen es muy grande (máx 5MB)', 'error');
+                return;
+            }
+
+            selectedFile = file;
             
-            // Guardar archivo para subir
-            window.selectedFile = file;
+            // Mostrar preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImage').src = e.target.result;
+                document.getElementById('fileInfo').innerHTML = `
+                    <strong>${file.name}</strong><br>
+                    ${(file.size / 1024 / 1024).toFixed(2)} MB
+                `;
+                document.getElementById('previewContainer').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Habilitar botón de subir
+            document.getElementById('uploadBtn').disabled = false;
+            
+            showStatus('Imagen seleccionada ✅', 'success');
         }
 
-        // Subir archivo
-        async function uploadFile() {
-            if (!window.selectedFile) return;
+        // Subir imagen
+        async function uploadImage() {
+            if (!selectedFile) return;
 
-            const uploadBtn = document.getElementById('uploadBtn');
-            const progress = document.getElementById('progress');
-            const result = document.getElementById('result');
-            const status = document.getElementById('status');
-
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = 'Subiendo...';
-            progress.style.display = 'block';
-            result.style.display = 'none';
-            status.style.display = 'none';
+            showLoading('Subiendo...');
+            document.getElementById('uploadBtn').disabled = true;
 
             try {
                 const formData = new FormData();
-                formData.append('imagen', window.selectedFile);
+                formData.append('imagen', selectedFile);
 
                 const response = await fetch(`${API_BASE}/upload`, {
                     method: 'POST',
@@ -333,55 +390,84 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    result.className = 'result success';
-                    result.innerHTML = `
-                        ✅ <strong>¡Éxito!</strong><br>
-                        Archivo: ${data.fileName}<br>
-                        <small>ID: ${data.fileId}</small>
-                    `;
-                    
-                    // Resetear formulario
-                    resetUploadForm();
+                    showStatus(`✅ ${data.message}: ${data.fileName}`, 'success');
+                    resetUpload();
                 } else {
                     throw new Error(data.message);
                 }
 
             } catch (error) {
-                result.className = 'result error';
-                result.innerHTML = `❌ <strong>Error:</strong> ${error.message}`;
+                showStatus(`❌ ${error.message}`, 'error');
                 
-                // Mostrar botón para reintentar si es error de autenticación
-                if (error.message.includes('autenticado')) {
-                    status.style.display = 'block';
-                    status.className = 'status error';
-                    status.innerHTML = `
-                        <p>Tu sesión expiró. Por favor, autentícate nuevamente.</p>
-                        <button class="btn" onclick="authenticate()">Reautenticar</button>
-                    `;
+                if (error.message.includes('autentic')) {
+                    showState('auth');
                 }
+            } finally {
+                hideLoading();
+                document.getElementById('uploadBtn').disabled = false;
             }
-
-            result.style.display = 'block';
-            progress.style.display = 'none';
-            uploadBtn.disabled = false;
-            uploadBtn.textContent = '⬆️ Subir Archivo';
         }
 
-        // Resetear formulario de subida
-        function resetUploadForm() {
+        // Cerrar sesión
+        function logout() {
+            if (confirm('¿Desconectar de Google Drive?')) {
+                selectedFile = null;
+                showState('auth');
+                resetUpload();
+            }
+        }
+
+        // Resetear subida
+        function resetUpload() {
+            selectedFile = null;
             document.getElementById('fileInput').value = '';
-            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('previewContainer').style.display = 'none';
             document.getElementById('uploadBtn').disabled = true;
-            window.selectedFile = null;
+            document.getElementById('statusMessage').style.display = 'none';
         }
 
-        // Escuchar mensajes de la ventana de autenticación
+        // Mostrar/ocultar estados
+        function showState(state) {
+            document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+            document.getElementById(`state${state.charAt(0).toUpperCase() + state.slice(1)}`).classList.add('active');
+        }
+
+        function showLoading(message) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').querySelector('p').textContent = message;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('statusMessage');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            // Auto-ocultar mensajes de éxito
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Escuchar mensajes de autenticación
         window.addEventListener('message', function(event) {
-            if (event.data.type === 'AUTH_SUCCESS') {
-                showUploadSection();
+            if (event.data === 'AUTH_SUCCESS') {
                 checkAuthStatus();
             }
         });
+
+        // Prevenir acciones táctiles no deseadas
+        document.addEventListener('touchmove', function(e) {
+            if (e.scale !== 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     </script>
 </body>
 </html>
