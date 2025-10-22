@@ -8,7 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware importante para producción
+// Middleware
 app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,83 +27,106 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
+});
 
-// Configura OAuth2 - IMPORTANTE para producción
+// Configura OAuth2
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  process.env.REDIRECT_URI || `https://${process.env.RAILWAY_STATIC_URL}/auth/callback`
+  process.env.REDIRECT_URI
 );
 
-// Almacenamiento en memoria (en producción usarías Redis o DB)
 let userTokens = {};
 
-// Ruta principal
+// ===== RUTAS =====
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Ruta para iniciar autenticación
 app.get('/auth', (req, res) => {
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/drive.file'],
-    prompt: 'consent'
-  });
-  res.redirect(authUrl);
+  try {
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['https://www.googleapis.com/auth/drive.file'],
+      prompt: 'consent'
+    });
+    
+    console.log('🔗 Redirigiendo a Google OAuth');
+    res.redirect(authUrl);
+    
+  } catch (error) {
+    console.error('Error en /auth:', error);
+    res.status(500).json({ error: 'Error de configuración OAuth' });
+  }
 });
 
-// Ruta de callback después de la autenticación
 app.get('/auth/callback', async (req, res) => {
-  const { code } = req.query;
-  
+  const { code, error } = req.query;
+
+  if (error) {
+    console.error('Error OAuth:', error);
+    return res.send(`
+      <html>
+      <body style="font-family: Arial; padding: 50px; text-align: center;">
+        <h2 style="color: red;">Error de Google: ${error}</h2>
+        <a href="/">Volver al inicio</a>
+      </body>
+      </html>
+    `);
+  }
+
   try {
+    console.log('🔑 Intercambiando código por tokens...');
     const { tokens } = await oauth2Client.getToken(code);
-    userTokens = tokens; // Guardar en memoria
+    userTokens = tokens;
+    
+    console.log('✅ Autenticación exitosa');
     
     res.send(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>Autenticación Exitosa</title>
+        <meta http-equiv="refresh" content="3;url=/" />
         <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-          .success { color: #4CAF50; font-size: 24px; }
-          button { 
-            background-color: #4CAF50; 
-            color: white; 
-            padding: 15px 30px; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer;
-            margin: 20px;
+          body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 50px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .success { 
+            font-size: 28px; 
+            margin: 30px 0;
+          }
+          .icon { 
+            font-size: 64px; 
+            margin: 20px 0;
           }
         </style>
       </head>
       <body>
-        <div class="success">✅ ¡Autenticación exitosa!</div>
-        <p>Ya puedes subir archivos a Google Drive.</p>
-        <button onclick="window.close()">Cerrar ventana y volver a la aplicación</button>
-        <script>
-          // Enviar mensaje a la ventana principal
-          if (window.opener) {
-            window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
-          }
-          
-          setTimeout(() => {
-            window.close();
-          }, 2000);
-        </script>
+        <div class="icon">✅</div>
+        <div class="success">¡Autenticación Exitosa!</div>
+        <p>Serás redirigido automáticamente...</p>
+        <p><a href="/" style="color: #4CAF50;">Haz clic aquí si no redirige</a></p>
       </body>
       </html>
     `);
+    
   } catch (error) {
+    console.error('Error en callback:', error);
     res.send(`
       <html>
       <body style="font-family: Arial; padding: 50px; text-align: center;">
-        <h2 style="color: red;">Error en la autenticación</h2>
-        <p>${error.message}</p>
+        <h2 style="color: red;">Error: ${error.message}</h2>
         <a href="/">Volver al inicio</a>
       </body>
       </html>
@@ -111,15 +134,12 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Ruta para verificar autenticación
 app.get('/auth/status', (req, res) => {
   res.json({ 
-    authenticated: !!userTokens.access_token,
-    hasTokens: !!userTokens.access_token
+    authenticated: !!userTokens.access_token
   });
 });
 
-// Ruta para subir archivos
 app.post('/upload', upload.single('imagen'), async (req, res) => {
   try {
     if (!req.file) {
@@ -132,11 +152,10 @@ app.post('/upload', upload.single('imagen'), async (req, res) => {
     if (!userTokens.access_token) {
       return res.status(401).json({ 
         success: false, 
-        message: 'No estás autenticado. Por favor, autentícate primero.' 
+        message: 'No estás autenticado' 
       });
     }
 
-    // Configura el cliente de Drive con el token
     oauth2Client.setCredentials(userTokens);
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
@@ -150,45 +169,39 @@ app.post('/upload', upload.single('imagen'), async (req, res) => {
       body: fs.createReadStream(req.file.path)
     };
 
-    // Subir a Google Drive
     const response = await drive.files.create({
       resource: fileMetadata,
       media: media,
-      fields: 'id, name, webViewLink'
+      fields: 'id, name'
     });
 
-    // Limpiar archivo temporal
     fs.unlinkSync(req.file.path);
 
     res.json({ 
       success: true, 
       message: '¡Archivo subido exitosamente!',
       fileId: response.data.id,
-      fileName: response.data.name,
-      link: response.data.webViewLink
+      fileName: response.data.name
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error subiendo archivo:', error);
     
-    // Limpiar archivo temporal en caso de error
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
     
     res.status(500).json({ 
       success: false, 
-      message: 'Error al subir el archivo: ' + error.message 
+      message: 'Error: ' + error.message 
     });
   }
 });
 
-// Ruta de salud para Railway
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log(`📝 Modo: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Servidor DevAI corriendo en puerto ${PORT}`);
 });
